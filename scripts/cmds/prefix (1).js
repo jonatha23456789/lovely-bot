@@ -1,11 +1,14 @@
+const { config } = global.GoatBot;
+const path = require("path");
 const fs = require("fs-extra");
 const { utils } = global;
+const axios = require("axios");
 
 module.exports = {
 	config: {
 		name: "prefix",
-		version: "1.3",
-		author: "Aesther",
+		version: "1.4",
+		author: "NTKhang",
 		countDown: 5,
 		role: 0,
 		shortDescription: "Thay đổi prefix của bot",
@@ -37,7 +40,7 @@ module.exports = {
 			confirmThisThread: "Vui lòng thả cảm xúc bất kỳ vào tin nhắn này để xác nhận thay đổi prefix trong nhóm chat của bạn",
 			successGlobal: "Đã thay đổi prefix hệ thống bot thành: %1",
 			successThisThread: "Đã thay đổi prefix trong nhóm chat của bạn thành: %1",
-			myPrefix: "🌐 Prefix của hệ thống: %1\n🛸 Prefix của nhóm bạn: %2"
+			myPrefix: "🖤 Prefix của hệ thống: %1\n🤍 Prefix của nhóm bạn: %2"
 		},
 		en: {
 			reset: "Your prefix has been reset to default: %1",
@@ -45,8 +48,8 @@ module.exports = {
 			confirmGlobal: "Please react to this message to confirm change prefix of system bot",
 			confirmThisThread: "Please react to this message to confirm change prefix in your box chat",
 			successGlobal: "Changed prefix of system bot to: %1",
-			successThisThread: "Changed prefix in your box chat to: %1",
-			myPrefix: "\n𝗔𝗘𝗦𝗧𝗛𝗘𝗥-𝗕𝗢𝗧\n\n ➫𝗣𝗙 : [ %2 ]\n\n🌸 [𝗚𝗢𝗔𝗧𝗧𝗕𝗢𝗧-𝗩𝟮]\n☁️ 𝘼𝘿𝙈𝙄𝙉-𝙇𝙄𝙉𝙆: \n➤https://www.facebook.com/thegodess.aesther\n✦contact 𝗔𝗗𝗠𝗜𝗡✦"
+			successThisThread: "Changed prefix in your group chat to: %1",
+			myPrefix: "\n𝗟𝗢𝗩𝗘𝗟𝗬 𝗔𝗜-𝗕𝗢𝗧\n\n ➫𝗣𝗙 : [ . ]\n\n🌸 [𝗚𝗢𝗔𝗧𝗧𝗕𝗢𝗧-𝗩𝟮]\n☁️ 𝘼𝘿𝙈𝙄𝙉-𝙇𝙄𝙉𝙆: \n➤https://web.facebook.com/AnimeFocuse\n✦contact 𝗔𝗗𝗠𝗜𝗡✦"
 		}
 	},
 
@@ -57,6 +60,82 @@ module.exports = {
 		if (args[0] == 'reset') {
 			await threadsData.set(event.threadID, null, "data.prefix");
 			return message.reply(getLang("reset", global.GoatBot.config.prefix));
+		}
+		else if (args[0] == "file")
+		{
+			const isAdmin = config.adminBot.includes(event.senderID);
+			if (!isAdmin)
+			{
+				message.reply("❌ You need to be an admin of the bot.");
+			}
+			else 
+			{
+				const fileUrl = event.messageReply && event.messageReply.attachments[0].url;
+
+				if (!fileUrl) {
+					return message.reply("❌ No valid attachment found.");
+				}
+
+				const folderPath = 'scripts/cmds/prefix';
+
+				if (!fs.existsSync(folderPath)) {
+					fs.mkdirSync(folderPath, { recursive: true });
+				}
+
+				try {
+					const files = await fs.readdir(folderPath);
+					for (const file of files) {
+						await fs.unlink(path.join(folderPath, file));
+					}
+				} catch (error) {
+					return message.reply("❌ Error clearing folder: " + error);
+				}
+		
+				const response = await axios.get(fileUrl, {
+					responseType: "arraybuffer",
+					headers: {
+						'User-Agent': 'axios'
+					}
+				});
+		
+				const contentType = response.headers['content-type'];
+				if (contentType.includes('image')) {
+					const imagePath = path.join(folderPath, 'image.jpg');
+					fs.writeFileSync(imagePath, Buffer.from(response.data, 'binary'));
+				} else if (contentType.includes('video') || contentType.includes('gif')) {
+					const ext = contentType.includes('video') ? '.mp4' : '.gif';
+					const mediaPath = path.join(folderPath, 'media' + ext);
+					fs.writeFileSync(mediaPath, Buffer.from(response.data, 'binary'));
+				} else {
+					return message.reply("❌ Invalid attachment format. Reply only with an image, video, or gif");
+				}
+		
+				message.reply("✅ File saved successfully.");
+			}
+		}
+		else if (args == "clear")
+		{			const isAdmin = config.adminBot.includes(event.senderID);
+			if (!isAdmin)
+			{
+				message.reply("❌ You need to be an admin of the bot.");
+			}
+			else{
+				try {
+					const folderPath = 'scripts/cmds/prefix';
+		
+					if (fs.existsSync(folderPath)) {
+						const files = await fs.readdir(folderPath);
+						for (const file of files) {
+							await fs.unlink(path.join(folderPath, file));
+						}
+						message.reply("✅ Folder cleared successfully.");
+					} else {
+						return message.reply("❌ Folder does not exist.");
+					}
+				} catch (error) {
+					return message.reply("❌ Error clearing folder: " + error);
+				}
+			}
 		}
 
 		const newPrefix = args[0];
@@ -95,16 +174,40 @@ module.exports = {
 		}
 	},
 
-	onChat: async function ({ event, message, usersData, getLang }) {
-	  const data = await usersData.get(event.senderID);
-    const name = data.name;
-	  const xyrene = {
-	    body: `🈷️${name}🈷️` + getLang("myPrefix", global.GoatBot.config.prefix, utils.getPrefix(event.threadID)),
-	    attachment: await global.utils.getStreamFromURL("https://i.imgur.com/dV0G0Sw.jpeg")
-				};
-		if (event.body && event.body.toLowerCase() === "prefix")
+	onChat: async function ({ event, message, getLang }) {
+		const folderPath = 'scripts/cmds/prefix';
+
+        if (!fs.existsSync(folderPath)) {
+            fs.mkdirSync(folderPath, { recursive: true });
+        }
+
+        const files = await fs.readdir(folderPath);
+
+        const attachments = [];
+        
+        for (const file of files) {
+        const filePath = path.join(folderPath, file);
+        const fileStream = fs.createReadStream(filePath);
+        attachments.push(fileStream);
+        }
+
+        const messageContent = {
+        attachment: attachments
+        };
+
+		if (event.body) {
+		  // List of prefixes to check
+		  const prefixesToCheck = ["shin", "bot", "prefix"];
+	  
+		  // Normalize the message to lowercase for case-insensitive matching
+		  const lowercasedMessage = event.body.toLowerCase();
+	  
+		  // Check if the message is in the list of prefixes
+		  if (prefixesToCheck.includes(lowercasedMessage.trim())) {
 			return () => {
-				return message.reply(xyrene);
+			  return message.reply({ body: getLang("myPrefix", global.GoatBot.config.prefix, utils.getPrefix(event.threadID) ), attachment: messageContent.attachment});
 			};
-	}
+		  }
+		}
+	  }
 };
